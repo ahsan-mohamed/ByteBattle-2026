@@ -1,0 +1,173 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum QuizStatus {
+  DRAFT
+  PUBLISHED
+  ACTIVE
+  ENDED
+}
+
+enum Difficulty {
+  MEDIUM
+  HARD
+}
+
+enum AnswerOption {
+  A
+  B
+  C
+  D
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  AUTO_SUBMITTED
+  EXPIRED
+}
+
+enum ViolationType {
+  TAB_SWITCH
+  WINDOW_BLUR
+  COPY_ATTEMPT
+  PASTE_ATTEMPT
+  CUT_ATTEMPT
+  RIGHT_CLICK
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  leaderboardSnapshots LeaderboardSnapshot[]
+
+  @@map("admins")
+}
+
+model Quiz {
+  id              String     @id @default(uuid())
+  name            String
+  status          QuizStatus @default(DRAFT)
+  durationMinutes Int        @default(30)
+  maxViolations   Int        @default(3)
+  requiredTotal   Int        @default(30)
+  requiredMedium  Int        @default(25)
+  requiredHard    Int        @default(5)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  startedAt       DateTime?
+  endedAt         DateTime?
+  lastSheetsSyncAt    DateTime?
+  lastSheetsSyncCount Int?
+
+  questions            Question[]
+  attempts             QuizAttempt[]
+  leaderboardSnapshots LeaderboardSnapshot[]
+
+  @@map("quizzes")
+}
+
+model Question {
+  id           String       @id @default(uuid())
+  quizId       String
+  quiz         Quiz         @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  questionText String
+  optionA      String
+  optionB      String
+  optionC      String
+  optionD      String
+  correctAnswer AnswerOption
+  difficulty   Difficulty
+  category     String
+  displayOrder Int
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  answers Answer[]
+
+  @@index([quizId, displayOrder])
+  @@map("questions")
+}
+
+model Participant {
+  id        String   @id @default(uuid())
+  name      String
+  uniqueId  String   @unique
+  createdAt DateTime @default(now())
+
+  attempts QuizAttempt[]
+
+  @@map("participants")
+}
+
+model QuizAttempt {
+  id            String        @id @default(uuid())
+  quizId        String
+  quiz          Quiz          @relation(fields: [quizId], references: [id])
+  participantId String
+  participant   Participant   @relation(fields: [participantId], references: [id])
+  attemptToken  String        @unique @default(uuid())
+  startedAt     DateTime      @default(now())
+  expiresAt     DateTime
+  submittedAt   DateTime?
+  correctAnswers Int?
+  wrongAnswers   Int?
+  unanswered     Int?
+  score          Int?
+  timeTakenSeconds Int?
+  status         AttemptStatus @default(IN_PROGRESS)
+
+  answers    Answer[]
+  violations Violation[]
+
+  // one active/any attempt per participant per quiz
+  @@unique([quizId, participantId])
+  @@index([quizId, status])
+  @@map("quiz_attempts")
+}
+
+model Answer {
+  id             String       @id @default(uuid())
+  attemptId      String
+  attempt        QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       Question     @relation(fields: [questionId], references: [id])
+  selectedAnswer AnswerOption?
+  answeredAt     DateTime     @updatedAt
+
+  @@unique([attemptId, questionId])
+  @@map("answers")
+}
+
+model Violation {
+  id        String        @id @default(uuid())
+  attemptId String
+  attempt   QuizAttempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  type      ViolationType
+  timestamp DateTime      @default(now())
+  metadata  String?
+
+  @@index([attemptId, type])
+  @@map("violations")
+}
+
+model LeaderboardSnapshot {
+  id           String   @id @default(uuid())
+  quizId       String
+  quiz         Quiz     @relation(fields: [quizId], references: [id])
+  refreshedAt  DateTime @default(now())
+  refreshedById String
+  refreshedBy  Admin    @relation(fields: [refreshedById], references: [id])
+  data         String
+
+  @@map("leaderboard_snapshots")
+}
