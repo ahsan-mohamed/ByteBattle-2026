@@ -83,7 +83,19 @@ async function main() {
     },
   });
 
-  await prisma.question.deleteMany({ where: { quizId: quiz.id } });
+await prisma.answer.deleteMany({
+  where: {
+    question: {
+      quizId: quiz.id,
+    },
+  },
+});
+
+await prisma.question.deleteMany({
+  where: {
+    quizId: quiz.id,
+  },
+});
   await prisma.question.createMany({
     data: questions.map((q, i) => ({ ...q, quizId: quiz.id, displayOrder: i + 1 })),
   });
