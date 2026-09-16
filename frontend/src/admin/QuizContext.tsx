@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+  useCallback,
+} from "react";
 import { listQuizzes } from "./api";
 import { Quiz } from "./types";
 
@@ -19,14 +26,26 @@ export function AdminQuizProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
+
     try {
       const list = await listQuizzes();
+
       setQuizzes(list);
-      setSelectedId((prev) => {
-        if (prev && list.some((q) => q.id === prev)) return prev;
-        // Default to the ACTIVE quiz if there is one, else the most recent.
-        const active = list.find((q) => q.status === "ACTIVE");
-        return active?.id ?? list[0]?.id ?? null;
+
+      setSelectedId((previousId) => {
+        if (previousId && list.some((quiz) => quiz.id === previousId)) {
+          return previousId;
+        }
+
+        const activeQuiz = list.find((quiz) => quiz.status === "ACTIVE");
+
+        if (activeQuiz) {
+          return activeQuiz.id;
+        }
+
+        // The backend returns quizzes newest-first.
+        // If there is no ACTIVE quiz, select the newest one.
+        return list.length > 0 ? list[0].id : null;
       });
     } finally {
       setLoading(false);
@@ -34,14 +53,23 @@ export function AdminQuizProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
-  const selectedQuiz = quizzes.find((q) => q.id === selectedId) ?? null;
+  const selectedQuiz =
+    selectedId !== null
+      ? quizzes.find((quiz) => quiz.id === selectedId) ?? null
+      : null;
 
   return (
     <QuizContext.Provider
-      value={{ quizzes, selectedQuiz, selectQuiz: setSelectedId, loading, refresh }}
+      value={{
+        quizzes,
+        selectedQuiz,
+        selectQuiz: setSelectedId,
+        loading,
+        refresh,
+      }}
     >
       {children}
     </QuizContext.Provider>
@@ -49,7 +77,11 @@ export function AdminQuizProvider({ children }: { children: ReactNode }) {
 }
 
 export function useAdminQuiz(): QuizContextState {
-  const ctx = useContext(QuizContext);
-  if (!ctx) throw new Error("useAdminQuiz must be used within AdminQuizProvider");
-  return ctx;
+  const context = useContext(QuizContext);
+
+  if (!context) {
+    throw new Error("useAdminQuiz must be used within AdminQuizProvider");
+  }
+
+  return context;
 }

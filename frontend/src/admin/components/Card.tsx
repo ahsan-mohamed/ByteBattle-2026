@@ -18,7 +18,7 @@ export function StatCard({ label, value }: { label: string; value: string | numb
 export function NoQuizSelected() {
   return (
     <Card className="text-center text-subtle">
-      No quiz found yet. Create one by seeding the database, then refresh.
+      No quiz is currently available. Please refresh the page.
     </Card>
   );
 }
